@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Actual Budget Progress Bars for the Report Budget Style
 // @namespace    http://tampermonkey.net/
-// @version      0.72
-// @history      0.72 - budget = spent + available
-// @description  A script to add progress bars to elements
-// @author       wdpk - updated by masnes
+// @version      0.73
+// @history      0.73 - Improved automatic update of progress bars
+// @description  A script to add progress bars to elements and update them automatically
+// @author       wdpk - updated by masnes and Claude
 // @match        YOUR_ACTUAL_SERVER_URL_HERE
 // @match        https://app.actualbudget.org/*
 // @grant        none
@@ -12,6 +12,8 @@
 // Reference: https://gist.github.com/wdpk/50468c646ded67dfd6eb49775b89b935
 // NOTE TO USERS: This script contains hardcoded references to some elements which may change.
 // this script may require some maintenance, comments are added to explain most operations
+
+
 
 // Create a style element
 function colorEditor(){
@@ -400,81 +402,66 @@ elements.forEach(element => {
 
 }
 
-function updateProgress(){
-	const elements = document.querySelectorAll('.css-1g5tiot:has(div[data-testid="category-name"])');
-	elements.forEach(element => {
-    // Find the parent row element
-    const parentRow = element.closest('div[data-testid="row"]');
+function updateProgress() {
+    const elements = document.querySelectorAll('.css-1g5tiot:has(div[data-testid="category-name"])');
+    elements.forEach(element => {
+        const parentRow = element.closest('div[data-testid="row"]');
+        if (!parentRow) return;
 
-    if (!parentRow) { return ; }
-    // Get the value of the sibling elements (assuming it's text content)
-    const budget = parseFloat(parentRow.querySelector('div[data-testid="budget"]').textContent.replace(/,/g, ''));
-    const balance = parseFloat(parentRow.querySelector('div[data-testid="balance"]').textContent.replace(/,/g, ''));
-    const spent = Math.abs(parseFloat(parentRow.querySelector('div[data-testid="spent"]').textContent.replace(/,/g, '')));
-    const net = balance+spent;
-        // Find the progress bar for this element
+        const budget = parseFloat(parentRow.querySelector('div[data-testid="budget"]').textContent.replace(/,/g, ''));
+        const balance = parseFloat(parentRow.querySelector('div[data-testid="balance"]').textContent.replace(/,/g, ''));
+        const spent = Math.abs(parseFloat(parentRow.querySelector('div[data-testid="spent"]').textContent.replace(/,/g, '')));
+        const net = balance + spent;
+
         const newOuterDiv = parentRow.querySelector('.progress');
         const newInnerDiv = newOuterDiv.querySelector('.bar');
-    newOuterDiv.classList.remove('funded');
-    newOuterDiv.classList.remove('overspent');
-    newOuterDiv.classList.add('empty');
 
-    newInnerDiv.setAttribute('style',('width:0%; backgroundPosition:0 0%'));
-    // Calculate the percentage of spent over budget
-    if (net >= spent) {
-        var percentageCovered;
-		newOuterDiv.classList.add('funded');
-        newOuterDiv.classList.remove('empty');
-        percentageCovered = (spent / net) * 100;
-        if(percentageCovered=="Infinity") {
-            percentageCovered=0;
-        }
-        newInnerDiv.setAttribute('style',('width:' + percentageCovered + '%; background-position:0 '+ percentageCovered + '%'));
-    }
-	else if (spent > net) {
-		newOuterDiv.classList.add('overspent');
-        newOuterDiv.classList.remove('empty');
-        var percentageOverspent;
-        percentageOverspent = (net / spent) * 100;
-        if(percentageOverspent=="Infinity") {
-            percentageOverspent=0;
-        }
-        newInnerDiv.setAttribute('style',('width:' + percentageOverspent + '%; background-position:0 '+ percentageOverspent + '%'));
-    }
-});}
+        newOuterDiv.classList.remove('funded', 'overspent', 'empty');
+        newInnerDiv.style.width = '0%';
+        newInnerDiv.style.backgroundPosition = '0 0%';
 
-//watcher script
-function watcher(){
+        if (net >= spent) {
+            newOuterDiv.classList.add('funded');
+            const percentageCovered = (spent / net) * 100 || 0;
+            newInnerDiv.style.width = `${percentageCovered}%`;
+            newInnerDiv.style.backgroundPosition = `0 ${percentageCovered}%`;
+        } else if (spent > net) {
+            newOuterDiv.classList.add('overspent');
+            const percentageOverspent = (net / spent) * 100 || 0;
+            newInnerDiv.style.width = `${percentageOverspent}%`;
+            newInnerDiv.style.backgroundPosition = `0 ${percentageOverspent}%`;
+        } else {
+            newOuterDiv.classList.add('empty');
+        }
+    });
+}
+
+function watcher() {
     setupProgressBars();
     updateProgress();
     setupColorPicker();
-    var targetNode = document.querySelector('span[data-testid="category-month-spent"]');
 
-    // Options for the observer (which mutations to observe)
-    var config = { attributes: true, childList: true, subtree: true };
+    const targetNode = document.querySelector('div[data-testid="budget-table"]');
+    if (!targetNode) {
+        console.error('Target node for observer not found');
+        return;
+    }
 
-    // Variable to store the state of updateProgress function
-    var isUpdateInProgress = false;
+    const config = { childList: true, subtree: true, characterData: true, attributes: true };
 
-    // Callback function to execute when mutations are observed
-    var callback = function(mutationsList, observer) {
-        for(var mutation of mutationsList) {
-            // Check if update is not in progress
-            if (!isUpdateInProgress) {
-                isUpdateInProgress = true; // Set the flag to true
+    const observer = new MutationObserver((mutationsList) => {
+        for (const mutation of mutationsList) {
+            if (mutation.type === 'characterData' ||
+                (mutation.type === 'attributes' && mutation.attributeName === 'data-testid') ||
+                mutation.type === 'childList') {
                 updateProgress();
-                // Reset the flag after 1 second
-                setTimeout(function() {
-                    isUpdateInProgress = false;
-                }, 156);
+                break;
             }
         }
-    };
+    });
 
-    // Create an observer instance linked to the callback function
-    var observer = new MutationObserver(callback);
-
-    // Start observing the target node for configured mutations
     observer.observe(targetNode, config);
 }
-setTimeout(watcher,6000);
+
+// Start the watcher after a short delay to ensure the DOM is fully loaded
+setTimeout(watcher, 2000);
