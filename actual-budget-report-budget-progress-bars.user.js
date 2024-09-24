@@ -4,11 +4,12 @@
 // @version      0.71
 // @history      0.71 - budget = spent handling
 // @description  A script to add progress bars to elements
-// @author       wdpk
+// @author       wdpk - updated by masnes
 // @match        YOUR_ACTUAL_SERVER_URL_HERE
 // @match        https://app.actualbudget.org/*
 // @grant        none
 // ==/UserScript==
+// Reference: https://gist.github.com/wdpk/50468c646ded67dfd6eb49775b89b935
 // NOTE TO USERS: This script contains hardcoded references to some elements which may change.
 // this script may require some maintenance, comments are added to explain most operations
 
