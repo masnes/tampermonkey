@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Actual Budget Progress Bars for the Report Budget Style
 // @namespace    http://tampermonkey.net/
-// @version      0.71
-// @history      0.71 - budget = spent handling
+// @version      0.72
+// @history      0.72 - budget = spent + available
 // @description  A script to add progress bars to elements
 // @author       wdpk - updated by masnes
 // @match        YOUR_ACTUAL_SERVER_URL_HERE
